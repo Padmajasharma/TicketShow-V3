@@ -1,0 +1,12 @@
+node_modules
+dist
+Backend/.env
+Backend/.venv
+Backend/instance
+.git
+*.log
+__pycache__
+*.pyc
+public/dist
+frontend/node_modules
+Dockerfile.frontend

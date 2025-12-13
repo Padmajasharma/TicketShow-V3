@@ -1,0 +1,17 @@
+venv/
+env/
+.venv/
+node_modules/
+dist/
+.env
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+/.vscode/
+.idea/
+dump.rdb
+*.log
+public/dist/
+Backend/static/uploads/
+Backend/instance/

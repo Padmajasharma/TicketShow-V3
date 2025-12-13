@@ -1,0 +1,63 @@
+version: '3.8'
+services:
+  web:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./Backend/.env.example
+    ports:
+      - "8000:5000"
+    depends_on:
+      - db
+      - redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"
+    restart: always
+    depends_on:
+      - web
+
+  worker:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    command: celery -A extensions.celery worker --loglevel=info
+    env_file:
+      - ./Backend/.env.example
+    depends_on:
+      - redis
+      - db
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ticketshow
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: ticketshow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  redis-data:
+  pgdata:

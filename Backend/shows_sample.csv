@@ -1,0 +1,3 @@
+name,start_time,end_time,theatre_id,ticket_price,capacity
+Sample Show,2025-12-20T19:00:00,2025-12-20T21:00:00,1,350.0,150
+Late Night Concert,2025-12-22T22:00:00,2025-12-23T01:00:00,1,500.0,200

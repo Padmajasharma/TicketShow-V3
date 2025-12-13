@@ -1,0 +1,91 @@
+import urllib.request
+import json
+import ssl
+
+API_KEY = "9f044f29dce2ab2f0084689d8a610547"
+BASE_IMG = "https://image.tmdb.org/t/p/w300"
+
+# Disable SSL verification (macOS dev issue)
+CTX = ssl._create_unverified_context()
+
+
+# ------------------------------
+#  Fetch JSON from a URL
+# ------------------------------
+def fetch_json(url):
+    try:
+        with urllib.request.urlopen(url, timeout=15, context=CTX) as r:
+            return json.load(r)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ------------------------------
+#  Get movie poster by movie ID
+# ------------------------------
+def get_movie_poster(movie_id):
+    url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={API_KEY}&language=en-US"
+    data = fetch_json(url)
+
+    if "error" in data:
+        return movie_id, None, data["error"]
+
+    poster_path = data.get("poster_path")
+    full_url = BASE_IMG + poster_path if poster_path else None
+
+    return movie_id, full_url, None
+
+
+# ------------------------------
+#  Get person profile photo by person ID
+# ------------------------------
+def get_artist_photo(person_id):
+    url = f"https://api.themoviedb.org/3/person/{person_id}?api_key={API_KEY}&language=en-US"
+    data = fetch_json(url)
+
+    if "error" in data:
+        return person_id, None, None, data["error"]
+
+    name = data.get("name")
+    profile_path = data.get("profile_path")
+    full_url = BASE_IMG + profile_path if profile_path else None
+
+    return person_id, name, full_url, None
+
+
+# ------------------------------
+#  Batch fetch movie posters
+# ------------------------------
+def fetch_movie_posters(movie_ids):
+    results = []
+    for mid in movie_ids:
+        movie_id, poster_url, error = get_movie_poster(mid)
+        results.append((movie_id, poster_url, error))
+    return results
+
+
+# ------------------------------
+#  Batch fetch artist photos
+# ------------------------------
+def fetch_artist_photos(person_ids):
+    results = []
+    for pid in person_ids:
+        artist_id, name, photo_url, error = get_artist_photo(pid)
+        results.append((artist_id, name, photo_url, error))
+    return results
+
+
+# ------------------------------
+#  Example usage
+# ------------------------------
+
+movies = [1813, 350, 18897, 10990, 30614, 1245, 525, 138]
+artists = [6193, 6384, 5064, 500, 287, 1136406, 819, 18918]
+
+print("\n🎬 Movie Posters:")
+for mid, poster, error in fetch_movie_posters(movies):
+    print(mid, poster if poster else f"ERROR: {error}")
+
+print("\n⭐ Artist Photos:")
+for pid, name, photo, error in fetch_artist_photos(artists):
+    print(pid, name if name else "Unknown", photo if photo else f"ERROR: {error}")
