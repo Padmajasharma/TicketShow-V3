@@ -70,9 +70,14 @@ def upgrade():
         batch_op.create_foreign_key('fk_show_movie', 'movie', ['movie_id'], ['id'])
         batch_op.create_index('ix_show_start_time', ['start_time'])
 
-    # Add screen_id to ticket
+    # Add screen_id and booked_at to ticket (ensure booked_at exists before index)
     with op.batch_alter_table('ticket') as batch_op:
         batch_op.add_column(sa.Column('screen_id', sa.Integer(), nullable=True))
+        # Add booked_at column if it does not exist (for fresh DBs)
+        try:
+            batch_op.add_column(sa.Column('booked_at', sa.DateTime(), nullable=True))
+        except Exception:
+            pass
         batch_op.create_foreign_key('fk_ticket_screen', 'screen', ['screen_id'], ['id'])
         batch_op.create_index('ix_ticket_show_id', ['show_id'])
         batch_op.create_index('ix_ticket_booked_at', ['booked_at'])
