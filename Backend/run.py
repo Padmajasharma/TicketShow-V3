@@ -1,19 +1,12 @@
+
+# Ensure eventlet monkey patching is FIRST if available
+try:
+    import eventlet
+    eventlet.monkey_patch()
+except Exception:
+    pass
+
 import os
-
-def auto_run_migrations():
-    if os.environ.get("AUTO_MIGRATE", "1") == "1":
-        try:
-            from flask_migrate import upgrade
-            with app.app_context():
-                upgrade()
-            print("[INFO] Database migrations applied successfully.")
-        except Exception as e:
-            print(f"[ERROR] Failed to apply migrations: {e}")
-
-# Call this right after app and extensions are set up, before any DB/cache access
-auto_run_migrations()
-# Ensure os is imported first for all code
-# backend/run.py
 import base64
 from io import BytesIO
 from dotenv import load_dotenv
@@ -48,6 +41,7 @@ from models import User, Role, Theatre, Show, ShowRating, Ticket  # ensure model
 import tasks  # Import tasks to register with Celery
 import click
 
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -75,8 +69,22 @@ CORS(app,
 
 # Remove after_request CORS header injection to avoid duplicate/multiple origins
 
+# Initialize extensions and celery
 init_extensions(app)
 init_celery(app)
+
+# Run DB migrations after app and extensions are initialized
+def auto_run_migrations():
+    if os.environ.get("AUTO_MIGRATE", "1") == "1":
+        try:
+            from flask_migrate import upgrade
+            with app.app_context():
+                upgrade()
+            print("[INFO] Database migrations applied successfully.")
+        except Exception as e:
+            print(f"[ERROR] Failed to apply migrations: {e}")
+
+auto_run_migrations()
 # Initialize optional subsystems based on feature flags
 feature_flags = getattr(app.config, 'FEATURE_FLAGS', None) or app.config.get('FEATURE_FLAGS', {})
 if feature_flags.get('websocket_updates', False):
@@ -267,15 +275,6 @@ if __name__ == "__main__":
     # If Socket.IO was initialized, run the app via Socket.IO's runner
     # which will use the configured async mode (eventlet by default).
     if socketio:
-        try:
-            import eventlet
-            # Monkey-patch sockets/threads for eventlet compatibility
-            try:
-                eventlet.monkey_patch()
-            except Exception:
-                pass
-        except Exception:
-            pass
         # Disable the Flask reloader when running via Socket.IO to avoid
         # the reloader spawning a child process which attempts to bind the
         # same port again (causes "Address already in use").
