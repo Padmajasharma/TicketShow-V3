@@ -60,9 +60,13 @@ os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 api = Api(app)
 
 
-# Enable CORS for frontend origins (development - allow all for flexibility)
+
+# Enable CORS for deployed frontend (Vercel)
 CORS(app,
-    resources={r"/*": {"origins": "*"}},
+    resources={r"/*": {"origins": [
+        "https://ticket-show-v3.vercel.app",
+        "https://www.ticket-show-v3.vercel.app"
+    ]}},
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
