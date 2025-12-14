@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '2b57d8cefde0'
-down_revision = 'a5e9eb0d513f'
+down_revision = 'c4b1e9d8f0e2'
 branch_labels = None
 depends_on = None
 
@@ -28,7 +28,10 @@ def upgrade():
                 server_default=sa.text("'confirmed'")
             )
         )
-        batch_op.add_column(sa.Column('booked_at', sa.DateTime(), nullable=True))
+        from sqlalchemy import inspect
+        columns = [c['name'] for c in inspect(op.get_bind()).get_columns('ticket')]
+        if 'booked_at' not in columns:
+            batch_op.add_column(sa.Column('booked_at', sa.DateTime(), nullable=True))
         batch_op.add_column(sa.Column('ticket_pdf', sa.String(length=255), nullable=True))
 
     # ### end Alembic commands ###
