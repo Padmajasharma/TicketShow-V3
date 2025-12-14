@@ -1,3 +1,15 @@
+def auto_run_migrations():
+    if os.environ.get("AUTO_MIGRATE", "1") == "1":
+        try:
+            from flask_migrate import upgrade
+            with app.app_context():
+                upgrade()
+            print("[INFO] Database migrations applied successfully.")
+        except Exception as e:
+            print(f"[ERROR] Failed to apply migrations: {e}")
+
+# Call this right after app and extensions are set up, before any DB/cache access
+auto_run_migrations()
 # backend/run.py
 import os
 import base64
@@ -242,16 +254,6 @@ def seed_shows():
 
 
 if __name__ == "__main__":
-    # Auto-run DB migrations on startup (before any DB/cache/Redis access)
-    try:
-        from extensions import db
-        from flask_migrate import upgrade
-        with app.app_context():
-            upgrade()
-        print("[INFO] Database migrations applied successfully.")
-    except Exception as e:
-        print(f"[ERROR] Failed to apply migrations: {e}")
-
     # Now safe to initialize Redis cache, etc.
     if os.environ.get("SKIP_CACHE_INIT", "0") != "1":
         init_redis_cache()
