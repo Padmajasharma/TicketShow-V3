@@ -19,13 +19,9 @@ import BookingPage from './components/BookingPage.vue';
 import AdminAnalytics from './components/AdminAnalytics.vue';
 import { isTokenExpired, clearAuthData, getTimeUntilExpiry } from './utils/auth';
 
-// Configure API base URL dynamically
-const currentHost = window.location.hostname;
-const API_BASE_URL = `http://${currentHost}:5001`;
-
-// Set axios defaults
+// Configure API base URL from environment (Vercel/Netlify) or fallback to localhost for dev
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 axios.defaults.baseURL = API_BASE_URL;
-// Expose axios globally for components that reference it without import
 window.axios = axios;
 
 // Token expiration timer reference
