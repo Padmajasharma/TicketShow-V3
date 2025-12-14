@@ -10,6 +10,7 @@ def auto_run_migrations():
 
 # Call this right after app and extensions are set up, before any DB/cache access
 auto_run_migrations()
+# Ensure os is imported first for all code
 import os
 # backend/run.py
 import base64
