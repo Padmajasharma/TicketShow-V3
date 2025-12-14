@@ -84,8 +84,8 @@ def init_redis_cache():
 # Skip Redis/cache initialization during migrations or when explicitly requested.
 # This avoids querying the database for columns that may be added by migrations
 # while the Alembic/Flask-Migrate command is running.
-if os.environ.get("SKIP_CACHE_INIT", "0") != "1":
-    init_redis_cache()
+
+    # (Redis cache initialization moved to __main__ after migrations)
 
 register_resources(api, app)
 
@@ -242,7 +242,7 @@ def seed_shows():
 
 
 if __name__ == "__main__":
-    # Auto-run DB migrations on startup (for production/Render)
+    # Auto-run DB migrations on startup (before any DB/cache/Redis access)
     try:
         from extensions import db
         from flask_migrate import upgrade
@@ -251,6 +251,10 @@ if __name__ == "__main__":
         print("[INFO] Database migrations applied successfully.")
     except Exception as e:
         print(f"[ERROR] Failed to apply migrations: {e}")
+
+    # Now safe to initialize Redis cache, etc.
+    if os.environ.get("SKIP_CACHE_INIT", "0") != "1":
+        init_redis_cache()
 
     # If Socket.IO was initialized, run the app via Socket.IO's runner
     # which will use the configured async mode (eventlet by default).
