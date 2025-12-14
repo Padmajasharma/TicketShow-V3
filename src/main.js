@@ -20,7 +20,7 @@ import AdminAnalytics from './components/AdminAnalytics.vue';
 import { isTokenExpired, clearAuthData, getTimeUntilExpiry } from './utils/auth';
 
 // Configure API base URL from environment (Vercel/Netlify) or fallback to localhost for dev
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
+const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || 'http://localhost:5001';
 axios.defaults.baseURL = API_BASE_URL;
 window.axios = axios;
 
