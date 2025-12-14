@@ -242,6 +242,16 @@ def seed_shows():
 
 
 if __name__ == "__main__":
+    # Auto-run DB migrations on startup (for production/Render)
+    try:
+        from extensions import db
+        from flask_migrate import upgrade
+        with app.app_context():
+            upgrade()
+        print("[INFO] Database migrations applied successfully.")
+    except Exception as e:
+        print(f"[ERROR] Failed to apply migrations: {e}")
+
     # If Socket.IO was initialized, run the app via Socket.IO's runner
     # which will use the configured async mode (eventlet by default).
     if socketio:
