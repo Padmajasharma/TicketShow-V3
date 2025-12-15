@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 class SeatCache:
     """Redis-backed seat cache and atomic reservation helpers."""
 
-    def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0):
-        self.redis = redis.Redis(host=host, port=port, db=db, decode_responses=True)
+    def __init__(self):
+        self._redis = None
 
         # fallback callable used when scripts cannot be registered
         def _scripts_unavailable(*args, **kwargs):
@@ -32,7 +32,7 @@ class SeatCache:
 
         def _register(script_text: str):
             try:
-                return self.redis.register_script(script_text)
+                return self.get_redis().register_script(script_text)
             except Exception as e:
                 logger.warning(f"Failed to register redis script: {e}")
                 return _scripts_unavailable
@@ -199,6 +199,7 @@ class SeatCache:
                 return redis.status_reply('OK')
             """)
 
+
         except Exception as e:
             logger.warning(f"Redis scripts could not be registered at startup: {e}")
             # Safe fallbacks
@@ -209,9 +210,22 @@ class SeatCache:
             self.confirm_seat_hold_script = _scripts_unavailable
             self.release_seat_hold_script = _scripts_unavailable
 
+    def get_redis(self):
+        if self._redis is None:
+            import os
+            redis_url = os.environ.get("REDIS_URL")
+            if not redis_url:
+                raise redis.ConnectionError("REDIS_URL not set")
+            self._redis = redis.Redis.from_url(
+                redis_url,
+                decode_responses=True,
+                socket_connect_timeout=5,
+            )
+        return self._redis
+
     def get_show_capacity(self, show_id: int) -> Optional[int]:
         try:
-            capacity = self.redis.get(f"show:{show_id}:capacity")
+            capacity = self.get_redis().get(f"show:{show_id}:capacity")
             return int(capacity) if capacity is not None else None
         except redis.ConnectionError:
             logger.warning("Redis unavailable for capacity check")
@@ -219,7 +233,7 @@ class SeatCache:
 
     def set_show_capacity(self, show_id: int, capacity: int) -> bool:
         try:
-            return self.redis.set(f"show:{show_id}:capacity", str(capacity))
+            return self.get_redis().set(f"show:{show_id}:capacity", str(capacity))
         except redis.ConnectionError:
             logger.warning("Redis unavailable for capacity update")
             return False
@@ -288,11 +302,11 @@ class SeatCache:
                 # emit websocket event for held seats
                 try:
                     if emit_seat_update:
-                            try:
-                                logger.info(f"Emitting seat_held for show {show_id}, reservation {reservation_id}, seats={seats}")
-                                emit_seat_update(int(show_id), 'seat_held', {'reservation_id': reservation_id, 'seats': seats})
-                            except Exception as ee:
-                                logger.exception(f"Failed to emit seat_held for reservation {reservation_id}: {ee}")
+                        try:
+                            logger.info(f"Emitting seat_held for show {show_id}, reservation {reservation_id}, seats={seats}")
+                            emit_seat_update(int(show_id), 'seat_held', {'reservation_id': reservation_id, 'seats': seats})
+                        except Exception as ee:
+                            logger.exception(f"Failed to emit seat_held for reservation {reservation_id}: {ee}")
                 except Exception:
                     pass
                 return result
@@ -316,7 +330,7 @@ class SeatCache:
                         # notify that seats were confirmed (no longer held)
                         # fetch seats from reservation key
                         try:
-                            seats_csv = self.redis.hget(reservation_key, 'seats') or ''
+                            seats_csv = self.get_redis().hget(reservation_key, 'seats') or ''
                             seats = seats_csv.split(',') if seats_csv else []
                             logger.info(f"Emitting seat_confirmed for show {show_id}, reservation {reservation_id}, seats={seats}")
                             emit_seat_update(int(show_id), 'seat_confirmed', {'reservation_id': reservation_id, 'seats': seats})
@@ -342,7 +356,7 @@ class SeatCache:
                     if emit_seat_update:
                         # attempt to read show_id and seats from reservation before deletion
                         try:
-                            data = self.redis.hgetall(reservation_key)
+                            data = self.get_redis().hgetall(reservation_key)
                             show_id = int(data.get('show_id')) if data.get('show_id') else None
                             seats_csv = data.get('seats') or ''
                             seats = seats_csv.split(',') if seats_csv else []
@@ -364,12 +378,12 @@ class SeatCache:
     def get_active_holds(self, show_id: int) -> List[Dict]:
         try:
             pattern = f'hold:show:{show_id}:seat:*'
-            keys = self.redis.keys(pattern)
+            keys = self.get_redis().keys(pattern)
             holds = []
             for k in keys:
                 parts = k.split(':')
                 seat_id = parts[-1]
-                reservation_id = self.redis.get(k)
+                reservation_id = self.get_redis().get(k)
                 if reservation_id:
                     try:
                         res_id = int(reservation_id)
@@ -387,10 +401,10 @@ class SeatCache:
     def get_active_reservations(self, show_id: int) -> List[Dict]:
         try:
             pattern = f"reservation:*"
-            keys = self.redis.keys(pattern)
+            keys = self.get_redis().keys(pattern)
             reservations = []
             for key in keys:
-                data = self.redis.hgetall(key)
+                data = self.get_redis().hgetall(key)
                 if data.get('show_id') == str(show_id):
                     reservations.append({
                         'reservation_id': key.split(':')[1],
@@ -417,11 +431,12 @@ class SeatCache:
             logger.error(f"Cleanup failed: {e}")
             return 0
 
+
     # Theatre seat map caching helpers
     def get_theatre_seat_map(self, theatre_id: int) -> Optional[List[Dict]]:
         try:
             key = f"theatre:{theatre_id}:seats"
-            data = self.redis.get(key)
+            data = self.get_redis().get(key)
             if not data:
                 return None
             import json
@@ -437,7 +452,7 @@ class SeatCache:
         try:
             key = f"theatre:{theatre_id}:seats"
             import json
-            self.redis.set(key, json.dumps(seat_list))
+            self.get_redis().set(key, json.dumps(seat_list))
             return True
         except redis.ConnectionError:
             logger.warning('Redis unavailable for theatre seat map set')
@@ -449,7 +464,7 @@ class SeatCache:
     def delete_theatre_seat_map(self, theatre_id: int) -> bool:
         try:
             key = f"theatre:{theatre_id}:seats"
-            self.redis.delete(key)
+            self.get_redis().delete(key)
             return True
         except redis.ConnectionError:
             logger.warning('Redis unavailable for theatre seat map delete')
