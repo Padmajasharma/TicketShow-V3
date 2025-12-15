@@ -1,10 +1,5 @@
 
-# Ensure eventlet monkey patching is FIRST if available
-try:
-    import eventlet
-    eventlet.monkey_patch()
-except Exception:
-    pass
+
 
 import os
 import base64
@@ -15,16 +10,12 @@ import logging
 # Load environment variables from .env file
 load_dotenv()
 
-# If eventlet is available, monkey-patch the stdlib as early as possible
-# to ensure compatibility with Flask-SocketIO. This must happen before
-# importing modules that create threads or rely on blocking stdlib calls.
-try:
+
+# Only use eventlet for Python < 3.12 (not compatible with 3.12+)
+import sys
+if sys.version_info < (3, 12):
     import eventlet
     eventlet.monkey_patch()
-except Exception:
-    # eventlet not installed or monkey-patch failed; we'll attempt a
-    # graceful fallback later when starting the server.
-    pass
 
 from flask import Flask, jsonify, send_from_directory
 from flask_restful import Api
@@ -74,15 +65,25 @@ init_extensions(app)
 init_celery(app)
 
 # Run DB migrations after app and extensions are initialized
+auto_run_migrations()
+
+# Only run migrations in the main process (not every worker)
 def auto_run_migrations():
     if os.environ.get("AUTO_MIGRATE", "1") == "1":
-        try:
-            from flask_migrate import upgrade
-            with app.app_context():
-                upgrade()
-            print("[INFO] Database migrations applied successfully.")
-        except Exception as e:
-            print(f"[ERROR] Failed to apply migrations: {e}")
+        # Gunicorn: only run in master process; Werkzeug: only run in main process
+        is_main = (
+            os.environ.get("WERKZEUG_RUN_MAIN") == "true" or
+            os.environ.get("RUN_MAIN") == "true" or
+            os.getpid() == os.getppid()  # fallback: only run in parent process
+        )
+        if is_main:
+            try:
+                from flask_migrate import upgrade
+                with app.app_context():
+                    upgrade()
+                print("[INFO] Database migrations applied successfully.")
+            except Exception as e:
+                print(f"[ERROR] Failed to apply migrations: {e}")
 
 auto_run_migrations()
 # Initialize optional subsystems based on feature flags
@@ -266,6 +267,15 @@ def seed_shows():
         db.session.commit()
         print(f"Seeded {created} shows.")
 
+
+
+# --- Flask CLI command to seed shows ---
+@app.cli.command("seed_shows")
+def seed_shows():
+    """Seed shows into the database."""
+    from seed_shows import seed_data
+    seed_data()
+    print("✅ Shows seeded successfully")
 
 if __name__ == "__main__":
     # Now safe to initialize Redis cache, etc.
